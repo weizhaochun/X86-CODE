@@ -1,0 +1,21 @@
+	org	0000h
+	ljmp	0100h
+	org	0023h
+	ljmp	int
+	org	0100h
+start:	mov	tmod,#20h
+	mov	tl1,#0e8h
+	mov	th1,#0e8h
+	mov	pcon,#00h
+	mov	scon,#50h
+	setb	tr1
+	clr	ri
+	setb	ea
+	setb	es
+loop:	mov	p1,a
+	sjmp	loop
+int:	clr	ri
+	mov	a,sbuf
+	cpl	a
+	reti
+	end

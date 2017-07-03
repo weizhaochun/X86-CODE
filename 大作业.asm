@@ -1,0 +1,827 @@
+	SDA	BIT	P1.0
+	SCL	BIT	P1.1
+	BUZZ	BIT	P1.3			;定义I2C引脚信号
+	WSLA_8563	EQU	0A2H
+	RSLA_8563	EQU	0A3H
+	WSLA_7290	EQU	70H
+	RSLA_7290	EQU	71H
+	ORG	0000H
+	LJMP	0100H
+	ORG	0003H
+	LJMP	INT_RCT
+	ORG	000BH
+	LJMP	INT_T0
+	ORG	0013H
+	LJMP	INT_7290
+	ORG	001BH
+	LJMP	INT_T1
+	ORG	0100H
+START:	MOV	SP,#60H
+
+
+	MOV	TMOD,#11H
+	MOV	TL1,#0FCH
+	MOV	TH1,#4BH
+	MOV	R1,#10				;T1作4s定时
+	MOV	R6,#08
+	CLR	TR1
+	SETB	ET1
+	SETB	PT1
+	MOV	TL0,#033H
+	MOV	TH0,#0FEH			;T0控制蜂鸣器发声频率
+	CLR	TR0	
+	SETB	ET0
+	SETB	PT0
+	SETB	BUZZ
+	
+	CLR	P1.7
+	LCALL	DELAY
+	SETB	P1.7
+	
+	MOV	10H,#00H
+	MOV	11H,#1FH
+	MOV	12H,#55H
+	MOV	13H,#59H
+	MOV	14H,#10H
+	MOV	15H,#01H
+	MOV	16H,#06H
+	MOV	17H,#04H
+	MOV	18H,#17H
+	MOV	19H,#00H
+	MOV	1AH,#00H
+	MOV	1BH,#00H
+	MOV	1CH,#00H
+	MOV	1DH,#83H
+
+	
+	MOV	40H,#02H
+	MOV	41H,#02H
+	MOV	42H,#0CCH
+	MOV	43H,#0FCH
+	MOV	44H,#0CCH
+	MOV	45H,#0CCH
+	MOV	46H,#9EH
+	MOV	47H,#02H			;error显示缓冲区
+
+
+	MOV	50H,#11H
+	MOV	51H,#70H
+	MOV	52H,#00H
+
+	MOV	53H,#0FCH
+	MOV	54H,#0DAH
+
+	MOV	55H,#00H
+	MOV	56H,#00H
+	MOV	57H,#00H
+
+	MOV	R7,#01H
+	MOV	R0,#50H
+	MOV	R2,#0CH
+	MOV	R3,#WSLA_7290
+	LCALL	WRNBYT
+	LCALL	DELAY
+
+	LCALL	SHSH
+
+	MOV	R7,#0EH
+	MOV	R0,#10H
+	MOV	R2,#00H
+	MOV	R3,#WSLA_8563
+	LCALL	WRNBYT
+	SETB	EA
+	SETB	EX0
+	SETB	IT0
+	SETB	EX1
+	SJMP	$
+
+
+
+
+SHSH:	PUSH	00H
+	PUSH	02H
+	PUSH	03H
+	PUSH	07H
+	MOV	R7,#02H
+	MOV	R0,#51H
+	MOV	R2,#07H
+	MOV	R3,#WSLA_7290
+	LCALL	WRNBYT
+	LCALL	DELAY
+	POP	07H
+	POP	03H
+	POP	02H
+	POP	00H
+	RET
+
+
+
+
+INT_RCT:	
+	MOV	R7,#07H
+	MOV	R0,#20H	
+	MOV	R2,#02H
+	MOV	R3,#WSLA_8563
+	MOV	R4,#RSLA_8563
+	LCALL	RDADD
+	LCALL	ADJUST
+
+	LCALL	BAOJING
+
+	LCALL	CHAFEN
+	MOV	R7,#08H
+	MOV	R2,#10H
+	MOV	R3,#WSLA_7290
+	JNB	P1.2,YEARS
+	MOV	R0,#38H
+	SJMP	DISP
+YEARS:	MOV	R0,#28H
+DISP:	LCALL	WRNBYT
+	LCALL	DELAY
+	JNB	P3.2,$
+	RETI
+
+CHAFEN:	PUSH	PSW
+	PUSH	ACC
+	PUSH	03H
+	PUSH	04H
+	MOV	A,20H
+	LCALL	CF
+	MOV	38H,R3
+	MOV	39H,R4
+	MOV	3AH,#02H
+
+	MOV	A,21H
+	LCALL	CF
+	MOV	3BH,R3
+	MOV	3CH,R4
+	MOV	3DH,#02H
+
+	MOV	A,22H
+	LCALL	CF
+	MOV	3EH,R3
+	MOV	3FH,R4
+	
+	MOV	A,23H
+	LCALL	CF
+	MOV	A,R3
+	ORL	A,#01H
+	MOV	R3,A
+	MOV	28H,R3
+	MOV	29H,R4
+
+	MOV	A,25H
+	LCALL	CF
+	MOV	A,R3
+	ORL	A,#01H
+	MOV	R3,A
+	MOV	2AH,R3
+	MOV	2BH,R4
+
+	MOV	A,26H
+	LCALL	CF
+	MOV	A,R3
+	ORL	A,#01H
+	MOV	R3,A
+	MOV	2CH,R3
+	MOV	2DH,R4
+	MOV	2EH,53H
+	MOV	2FH,54H
+	POP	04H
+	POP	03H
+	POP	ACC
+	POP	PSW
+	RET
+
+CF:	PUSH	02H
+	PUSH	DPH
+	PUSH	DPL
+	MOV	DPTR,#LEDSEG
+	MOV	R2,A
+	ANL	A,#0FH
+	MOVC	A,@A+DPTR
+	MOV	R3,A
+	MOV	A,R2
+	SWAP	A
+	ANL	A,#0FH
+	MOVC	A,@A+DPTR
+	MOV	R4,A
+	POP	DPL
+	POP	DPH
+	POP	02H
+	RET
+
+LEDSEG:	DB	0FCH,60H,0DAH,0F2H,66H,0B6H,0BEH,0E4H
+	DB	0FEH,0F6H,0EEH,3EH,9CH,7AH,9EH,8EH
+
+ADJUST:	PUSH	ACC
+	MOV	A,20H
+	ANL	A,#7FH
+	MOV	20H,A
+	MOV	A,21H
+	ANL	A,#7FH
+	MOV	21H,A
+	MOV	A,22H
+	ANL	A,#3FH
+	MOV	22H,A
+	MOV	A,23H
+	ANL	A,#3FH
+	MOV	23H,A
+	MOV	A,24H
+	ANL	A,#07H
+	MOV	24H,A
+	MOV	A,25H
+	ANL	A,#1FH
+	MOV	25H,A
+	POP	ACC
+	RET
+
+
+DELAY:	PUSH	00H
+	PUSH	01H
+	MOV	R0,#00H
+DELAY1:	MOV	R1,#00H
+	DJNZ	R1,$
+	DJNZ	R0,DELAY1
+	POP	01H
+	POP	00H
+	RET
+
+BAOJING:
+	PUSH	ACC
+	MOV	A,#56H
+	CJNE	A,20H,BLP1
+	MOV	A,#59H
+	CJNE	A,21H,BLP1
+	MOV	52H,#0FFH
+	LCALL	SHSH
+	SETB	TR1
+	SETB	TR0
+BLP1:	POP	ACC
+	RET
+
+
+INT_T0:
+	PUSH	PSW
+	MOV	TL0,#33H
+	MOV	TH0,#0FEH
+	CPL	BUZZ
+	POP	PSW
+	RETI
+
+INT_T1:
+	PUSH	PSW
+	MOV	TL1,#0FCH
+	MOV	TH1,#4BH	
+	DJNZ	R1,T1LP1
+	MOV	R1,#10
+	CPL	TR0
+	DJNZ	R6,TILP2
+	MOV	R6,#08
+	CLR	TR0
+	CLR	TR1
+TILP2:	MOV	52H,#00H
+	LCALL	SHSH
+T1LP1:	POP	PSW
+	RETI
+
+
+INT_7290:
+	PUSH	00H
+	PUSH	01H
+	PUSH	02H
+	PUSH	03H
+	PUSH	04H
+	PUSH	07H
+	PUSH	ACC
+	PUSH	PSW
+	PUSH	DPH
+	PUSH	DPL
+
+
+
+	MOV	DPTR,#LEDSEG
+	LCALL	RDKEY
+CHOOSE:	JNB	P1.2,CHOOSE1_BUF
+	
+	CJNE	A,#0AH,BKEY
+
+AKEY:	MOV	52H,#0C0H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#03H,NEXT1
+NEXT1:	JNC	DOWN_BUF2
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#17H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	22H,#0FH
+	ORL	22H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#09H,NEXT2
+NEXT2:	JNC	DOWN_BUF2
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#16H
+	LCALL	WR8563_2
+	ANL	22H,#0F0H
+	ORL	22H,A
+	MOV	56H,#22H
+	MOV	57H,#04H
+	LCALL	WR8563
+	LJMP	DOWN
+CHOOSE1_BUF:	LJMP	CHOOSE1
+DOWN_BUF2:	LCALL	ERROR
+	LJMP	DOWN
+
+BKEY:	CJNE	A,#0BH,CKEY
+	MOV	52H,#018H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#06H,NEXT3
+NEXT3:	JNC	DOWN_BUF2
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#14H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	21H,#0FH
+	ORL	21H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXT4
+NEXT4:	JNC	DOWN_BUF2
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#13H
+	LCALL	WR8563_2
+	ANL	21H,#0F0H
+	ORL	21H,A
+	MOV	56H,#21H
+	MOV	57H,#03H	
+	LCALL	WR8563
+	LJMP	DOWN
+
+CKEY:	CJNE	A,#0CH,DOWN_BUF
+	MOV	52H,#03H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#06H,NEXT5
+NEXT5:	JNC	DOWN_BUF
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#11H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	20H,#0FH
+	ORL	20H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXT6
+NEXT6:	JNC	DOWN_BUF
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#10H
+	LCALL	WR8563_2
+	ANL	20H,#0F0H
+	ORL	20H,A
+	MOV	56H,#20H
+	MOV	57H,#02H	
+	LCALL	WR8563
+	LJMP	DOWN
+DOWN_BUF:	LCALL	ERROR
+	LJMP	DOWN
+
+
+CHOOSE1:
+	CJNE	A,#0AH,BKEY1
+
+AKEY1:	MOV	52H,#0C0H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXT7
+NEXT7:	JNC	DOWN_BUF3
+	MOVC	A,@A+DPTR
+	MOV	57H,#17H
+	MOV	54H,A
+	MOV	55H,A
+	LCALL	WR8563_2
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXT8
+NEXT8:	JNC	DOWN_BUF3
+	MOVC	A,@A+DPTR
+	MOV	57H,#16H
+	MOV	53H,A
+	MOV	55H,A
+	LCALL	WR8563_2
+	
+	LCALL	LDELAY
+
+	LJMP	DOWN
+
+BKEY1:	CJNE	A,#0BH,CKEY1
+	MOV	52H,#30H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXT9
+NEXT9:	JNC	DOWN_BUF3
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#15H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	26H,#0FH
+	ORL	26H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXTA
+NEXTA:	JNC	DOWN_BUF3
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#14H
+	LCALL	WR8563_2
+	ANL	26H,#0F0H
+	ORL	26H,A
+	MOV	56H,#26H
+	MOV	57H,#08H
+	LCALL	WR8563
+	LJMP	DOWN
+
+DOWN_BUF3:	
+	LCALL	ERROR
+	LJMP	DOWN
+
+
+CKEY1:	CJNE	A,#0CH,DKEY1
+	MOV	52H,#0CH
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#02H,NEXTB
+NEXTB:	JNC	DOWN_BUF3
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#13H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	25H,#0FH
+	ORL	25H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXTC
+NEXTC:	JNC	DOWN_BUF3
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#12H
+	LCALL	WR8563_2
+	ANL	25H,#0F0H
+	ORL	25H,A
+	MOV	56H,#25H
+	MOV	57H,#07H
+	LCALL	WR8563
+	LJMP	DOWN
+
+DKEY1:	CJNE	A,#0DH,DOWN
+	MOV	52H,#03H
+	LCALL	SHSH
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#04H,NEXTD
+NEXTD:	JNC	DOWN_BUF4
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#11H
+	LCALL	WR8563_2
+	SWAP	A
+	ANL	23H,#0FH
+	ORL	23H,A
+	JB	P3.3,$
+	LCALL	RDKEY
+	CJNE	A,#0AH,NEXTE
+NEXTE:	JNC	DOWN_BUF4
+	MOV	55H,A
+	MOVC	A,@A+DPTR
+	XCH	A,55H
+	MOV	57H,#10H
+	LCALL	WR8563_2
+	ANL	23H,#0F0H
+	ORL	23H,A
+	MOV	56H,#23H
+	MOV	57H,#05H
+	LCALL	WR8563
+	LJMP	DOWN
+DOWN_BUF4:	LCALL	ERROR	
+	
+DOWN:		
+
+	
+	MOV	52H,#00H
+	LCALL	SHSH
+	CLR	IE1
+	POP	DPL	
+	POP	DPH
+	POP	PSW
+	POP	ACC
+	POP	07H
+	POP	04H
+	POP	03H
+	POP	02H
+	POP	01H
+	POP	00H
+	RETI
+
+
+RDKEY:	MOV	R0,#1FH
+	MOV	R7,#01H
+	MOV	R2,#01H
+	MOV	R3,#WSLA_7290
+	MOV	R4,#RSLA_7290
+	LCALL	RDADD
+	MOV	A,1FH
+	DEC	A
+	RET
+
+WR8563_2:
+	PUSH	ACC
+	MOV	R7,#01H
+	MOV	R0,#55H
+	MOV	R2,57H
+	MOV	R3,#WSLA_7290
+	LCALL	WRNBYT
+	LCALL	DELAY
+	POP	ACC
+	RET
+
+WR8563:	
+	LCALL	LDELAY
+	MOV	R7,#01H
+	MOV	R0,56H
+	MOV	R2,57H
+	MOV	R3,#WSLA_8563
+	LCALL	WRNBYT
+	RET
+
+
+ERROR:
+	PUSH	ACC
+	PUSH	00H
+	PUSH	02H
+	PUSH	03H
+	PUSH	07H
+	MOV	52H,#0FFH
+	LCALL	SHSH
+	MOV	R7,#08H
+	MOV	R0,#40H
+	MOV	R2,#10H
+	MOV	R3,#WSLA_7290
+	LCALL	WRNBYT
+	LCALL	LDELAY
+	POP	07H
+	POP	03H
+	POP	02H
+	POP	00H
+	POP	ACC
+	RET
+
+LDELAY:	
+	PUSH	00H
+	MOV	R1,#15
+LDELAY1:	
+	LCALL	DELAY
+	DJNZ	R1,LDELAY1
+	POP	00H
+	RET
+
+
+
+
+;【附录一】由汇编语言编制的I2C通讯子程序
+;【提  示】下列程序是在系统时钟为12MHZ（或11.0592MHZ），即NOP指令为1微秒左右。
+;（1）带有内部单元地址的多字节写操作子程序 WRNBYT
+;*******************************************************************
+;通用的I2C通讯子程序（多字节写操作）
+;入口参数R7字节数,R0:源数据块首地址
+;R0原数据块首地址；R2从器件内部子地址;R3:外围器件地址（写）
+;相关子程序WRBYT、STOP、CACK、STA
+;*******************************************************************	
+WRNBYT:	PUSH	PSW		
+		PUSH	ACC				
+WRADD:	MOV		A,R3		;取外围器件地地址（包含r/w=0）	
+		LCALL	STA		;发送起始信号S  
+		LCALL	WRBYT		;发送外围地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,WRADD	;如果应
+		MOV		A,R2
+		LCALL	WRBYT		;发送内部寄存器首地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,WRADD	;如果应答不正确返回重来 	
+WRDA:	MOV		A,@R0
+		LCALL	WRBYT		;发送外围地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,WRADD	;如果应答不正确返回重来
+		INC		R0
+		DJNZ  	R7,WRDA
+		LCALL	STOP 	
+		POP		ACC
+		POP		PSW
+		RET 	       
+;*******************************************************************
+
+
+
+
+
+
+
+
+
+
+;（2）带有内部单元地址的多字节读操作子程序 RDADD 
+;*******************************************************************
+;通用的I2C通讯子程序（多字节读操作）
+;入口参数R7字节数；
+;R0目标数据块首地址；R2从器件内部子地址；
+;R3器件地址（写）；R4器件地址（读）
+;相关子程序WRBYT、STOP、CACK、STA、MNACK 
+;*******************************************************************	
+RDADD:  PUSH	PSW			;从PCF8563的02H单元读入7个参数
+		PUSH	ACC			;存放于20H-26H单元	
+RDADD1:	LCALL	STA 
+		MOV		A,R3		;取器件地址（写）
+		LCALL	WRBYT		;发送外围地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,RDADD1	;如果应答不正确返回重来
+		MOV		A,R2		;取内部地址	
+		LCALL	WRBYT		;发送外围地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,RDADD1	;如果应答不正确返回重来	
+		LCALL	STA
+		MOV		A,R4		;取器件地址（读）
+		LCALL	WRBYT		;发送外围地址
+		LCALL	CACK		;检测外围器件的应答信号
+		JB		F0,RDADD1	;如果应答不正确返回重来
+RDN:	LCALL	RDBYT 	
+		MOV		@R0,A
+		DJNZ	R7,ACK
+		LCALL	MNACK
+		LCALL	STOP	
+		POP		ACC
+		POP		PSW
+		RET
+ACK:	LCALL	MACK
+		INC		R0
+		SJMP	RDN 
+
+
+
+
+
+
+
+;（3）I2C各个信号子程序
+;**********************************************************************
+;						启动信号子程序S 
+;**********************************************************************
+STA:	SETB	SDA		;启动信号S
+		SETB	SCL
+		NOP				;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP	
+		CLR		SDA
+		NOP				;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP 	
+		CLR		SCL
+		RET 
+;**********************************************************************
+;						停止信号子程序P 
+;**********************************************************************
+STOP:	CLR		SDA 	;停止信号P
+		SETB	SCL
+		NOP				;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP	
+		SETB	SDA
+		NOP				;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP	
+		CLR		SCL
+		CLR		SDA
+		RET 
+;**********************************************************************
+;						应答信号子程序   MACK
+;**********************************************************************
+MACK:	CLR		SDA	;发送应答信号ACK
+		SETB	SCL
+		NOP			;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP
+		CLR		SCL
+		SETB	SDA
+		RET
+;**********************************************************************
+;						非应答法信号子程序MNACK
+;**********************************************************************
+MNACK:	SETB	SDA		;发送非应答信号NACK
+		SETB	SCL
+		NOP				;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP
+		CLR		SCL
+		CLR		SDA
+		RET
+;**********************************************************************
+;						应答检测子程序CACK
+;**********************************************************************
+CACK:	SETB	SDA		;应答位检测子程序
+		SETB	SCL 
+		CLR		F0
+		MOV		C,SDA	;采样SDA
+		JNC		CEND	;应答正确时转CEND
+		SETB	F0		;应答错误时F0置一
+CEND:	CLR		SCL
+		RET
+;**********************************************************************
+;						发送一个字节子程序WRBYT
+;**********************************************************************
+WRBYT:	PUSH	06H
+MOV		R6,#08H		;发送一个字节子程序 
+WLP:	RLC		A 			;(入口参数A)
+		MOV		SDA,C
+		SETB	SCL
+		NOP					;产生4.7US延时
+		NOP
+		NOP
+		NOP
+		NOP
+		CLR		SCL
+		DJNZ	R6,WLP
+		POP		06H
+		RET
+;**********************************************************************
+;						接收一个字节子程序RDBYT 
+;**********************************************************************
+RDBYT: 	PUSH	06H
+		MOV		R6,#08H	;接收一个字节子程序
+RLP:	SETB	SDA
+		SETB	SCL
+;  *******************************************
+	NOP			;!!!!!产生大于15微秒的延时!!!!!!
+	NOP 		;注意这是专门为ZLG7290
+	NOP 		;添加的20微秒延时部分
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+;  ********************************************	
+	MOV		C,SDA
+	MOV		A,R2
+	RLC		A
+	MOV		R2,A
+	CLR		SCL
+	DJNZ	R6,RLP 		;(出口参数R2)
+	POP		06H
+	RET  
+;**********************************************************************
+	END
+
+
